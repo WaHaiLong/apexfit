@@ -3,7 +3,10 @@
     "allow": [
       "Bash(cd:*)",
       "Bash(gh auth:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git check-ignore:*)"
     ]
   }
 }
