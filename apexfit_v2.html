@@ -1,0 +1,986 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>APEXFIT — 肌肉图谱</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@300;400;500;600&display=swap');
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100%;height:100%;background:#08080f;font-family:'Inter',sans-serif;overflow:hidden}
+:root{--acc:#ff5722;--acc2:#7c4dff;--bg:#08080f;--bg2:#0f0f1c;--bg3:#171728;--t1:#f5f0ea;--t2:#666480;--bd:rgba(255,255,255,0.07)}
+.app{display:flex;flex-direction:column;height:100vh}
+.top{display:flex;align-items:center;justify-content:space-between;padding:10px 20px;border-bottom:1px solid var(--bd);background:rgba(8,8,15,.96);flex-shrink:0;z-index:10}
+.logo{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:3px;color:var(--acc)}
+.logo em{color:var(--t1);font-style:normal}
+.pulse-wrap{display:flex;align-items:center;gap:6px;font-size:10px;color:var(--t2)}
+.pulse{width:5px;height:5px;border-radius:50%;background:var(--acc);animation:pk 1.6s ease-in-out infinite}
+@keyframes pk{0%,100%{opacity:1}50%{opacity:.2}}
+.badge{font-size:10px;font-weight:600;color:var(--t2);background:var(--bg3);border:1px solid var(--bd);border-radius:20px;padding:3px 12px}
+.main{display:flex;flex:1;overflow:hidden}
+
+/* STAGE */
+.stage{flex:1;position:relative;overflow:hidden;background:radial-gradient(ellipse 65% 75% at 50% 45%,#110e28 0%,#08080f 72%)}
+.grid{position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.018) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.018) 1px,transparent 1px);background-size:36px 36px;pointer-events:none}
+.glow-floor{position:absolute;bottom:-20px;left:50%;transform:translateX(-50%);width:260px;height:60px;background:radial-gradient(ellipse,rgba(255,87,34,.1) 0%,transparent 70%);pointer-events:none;transition:background .4s}
+
+.body-stage{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;cursor:grab;touch-action:none;user-select:none}
+.body-stage:active{cursor:grabbing}
+.body-wrap{position:relative;width:280px;height:600px;transform-origin:center center;will-change:transform}
+
+/* The main body SVG */
+.body-wrap svg.figure{position:absolute;top:0;left:0;width:100%;height:100%;overflow:visible}
+
+/* Muscle highlight styles */
+.muscle{
+  fill:rgba(30,28,52,0.0);
+  stroke:transparent;
+  stroke-width:1;
+  cursor:pointer;
+  transition:fill .2s, filter .2s;
+}
+.muscle:hover{
+  fill:rgba(200,70,30,0.45);
+  filter:drop-shadow(0 0 5px rgba(255,87,34,.6));
+}
+.muscle.on{
+  fill:rgba(255,87,34,0.55);
+  filter:drop-shadow(0 0 8px rgba(255,87,34,.8)) drop-shadow(0 0 20px rgba(255,87,34,.4));
+  animation:glow1 2s ease-in-out infinite;
+}
+.muscle.on.sec{
+  fill:rgba(124,77,255,0.55);
+  filter:drop-shadow(0 0 8px rgba(124,77,255,.8)) drop-shadow(0 0 20px rgba(124,77,255,.4));
+  animation:glow2 2s ease-in-out infinite;
+}
+@keyframes glow1{0%,100%{fill:rgba(255,87,34,.5);filter:drop-shadow(0 0 7px rgba(255,87,34,.7))}50%{fill:rgba(255,87,34,.7);filter:drop-shadow(0 0 14px rgba(255,87,34,1)) drop-shadow(0 0 28px rgba(255,87,34,.5))}}
+@keyframes glow2{0%,100%{fill:rgba(124,77,255,.5);filter:drop-shadow(0 0 7px rgba(124,77,255,.7))}50%{fill:rgba(124,77,255,.7);filter:drop-shadow(0 0 14px rgba(124,77,255,1)) drop-shadow(0 0 28px rgba(124,77,255,.5))}}
+
+/* dots */
+.dots{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);display:flex;gap:5px}
+.dot{width:5px;height:5px;border-radius:50%;background:rgba(255,255,255,.12);transition:all .25s}
+.dot.on{background:var(--acc);box-shadow:0 0 6px var(--acc)}
+
+/* drag hint */
+.drag-hint{position:absolute;top:14px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--t2);display:flex;align-items:center;gap:6px;letter-spacing:.8px;transition:opacity .4s;pointer-events:none}
+.dh-icon{width:30px;height:18px;border:1px solid rgba(255,255,255,.2);border-radius:9px;display:flex;align-items:center;justify-content:center}
+.dh-dot{width:5px;height:5px;border-radius:50%;background:var(--t2);animation:slide 1.5s ease-in-out infinite}
+@keyframes slide{0%,100%{transform:translateX(-7px)}50%{transform:translateX(7px)}}
+
+/* PANEL */
+.panel{width:218px;flex-shrink:0;border-left:1px solid var(--bd);display:flex;flex-direction:column;background:rgba(8,8,15,.96)}
+.psec{padding:13px;border-bottom:1px solid var(--bd);flex-shrink:0}
+.ptit{font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t2);margin-bottom:9px}
+.pills{display:flex;flex-wrap:wrap;gap:4px}
+.pill{padding:3px 9px;border-radius:20px;font-size:10px;font-weight:600;border:1px solid var(--bd);color:var(--t2);cursor:pointer;transition:all .18s}
+.pill:hover{border-color:var(--acc);color:var(--acc)}
+.pill.on{background:rgba(255,87,34,.15);border-color:var(--acc);color:var(--acc)}
+.pill.on.sec{background:rgba(124,77,255,.15);border-color:var(--acc2);color:var(--acc2)}
+.pinfo{flex:1;overflow-y:auto;padding:12px;scrollbar-width:thin;scrollbar-color:#1a1a2a transparent}
+.icard{background:var(--bg2);border:1px solid var(--bd);border-radius:11px;padding:12px;margin-bottom:9px}
+.icard h3{font-size:14px;font-weight:600;color:var(--t1);margin-bottom:1px}
+.ien{font-size:10px;color:var(--t2);margin-bottom:8px}
+.icard p{font-size:11px;color:var(--t2);line-height:1.7}
+.istats{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:9px}
+.ist{background:var(--bg3);border-radius:8px;padding:7px;text-align:center}
+.isv{font-size:12px;font-weight:700;color:var(--acc)}
+.isl{font-size:9px;color:var(--t2);margin-top:1px}
+.ex{display:flex;align-items:center;gap:7px;padding:7px 8px;border-radius:8px;background:var(--bg2);border:1px solid var(--bd);margin-bottom:5px;transition:border-color .2s,transform .1s;cursor:pointer}
+.ex:hover{border-color:var(--acc);transform:translateX(2px)}
+.ei{width:24px;height:24px;border-radius:6px;background:rgba(255,87,34,.12);display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0}
+.en2{font-size:11px;font-weight:500;color:var(--t1)}
+.et{font-size:9px;color:var(--t2)}
+.empty{text-align:center;padding:36px 10px;color:var(--t2);font-size:11px;line-height:2.1}
+.pbot{padding:11px;border-top:1px solid var(--bd);flex-shrink:0}
+.cta{width:100%;padding:10px;border-radius:10px;background:linear-gradient(135deg,#ff5722,#e64a19);border:none;color:#fff;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;opacity:0;pointer-events:none;transition:opacity .3s,transform .15s;box-shadow:0 3px 16px rgba(255,87,34,.2)}
+.cta.on{opacity:1;pointer-events:all}
+.cta:hover{transform:translateY(-1px);box-shadow:0 5px 20px rgba(255,87,34,.38)}
+.bot{border-top:1px solid var(--bd);padding:8px 20px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;background:rgba(8,8,15,.96)}
+.bot span{font-size:10px;color:var(--t2)}
+#bang{font-size:10px;font-weight:600;color:var(--acc)}
+</style>
+</head>
+<body>
+<div class="app">
+<div class="top">
+  <div class="logo">APEX<em>FIT</em></div>
+  <div class="pulse-wrap"><span class="pulse"></span>拖拽旋转360° · 点击肌肉 · 滚轮缩放</div>
+  <div class="badge" id="vlabel">正面 0°</div>
+</div>
+<div class="main">
+
+<!-- STAGE -->
+<div class="stage">
+  <div class="grid"></div>
+  <div class="glow-floor" id="glowFloor"></div>
+  <div class="drag-hint" id="dhint"><div class="dh-icon"><div class="dh-dot"></div></div>左右拖拽旋转</div>
+
+  <div class="body-stage" id="bodyStage">
+    <div class="body-wrap" id="bodyWrap">
+
+      <!-- ===================== FRONT VIEW ===================== -->
+      <svg id="svF" class="figure" viewBox="0 0 280 600" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <linearGradient id="skinF" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#1e1c36"/>
+            <stop offset="100%" stop-color="#0e0c20"/>
+          </linearGradient>
+          <filter id="bodyShad">
+            <feDropShadow dx="4" dy="6" stdDeviation="8" flood-color="#000" flood-opacity=".6"/>
+          </filter>
+        </defs>
+
+        <!-- ═══ BODY SILHOUETTE (realistic proportions) ═══ -->
+        <!-- Head -->
+        <ellipse cx="140" cy="38" rx="30" ry="36" fill="#13122a"/>
+        <!-- Neck -->
+        <path d="M126,70 C124,80 124,90 140,93 C156,90 156,80 154,70 Z" fill="#13122a"/>
+        <!-- Ear L -->
+        <path d="M110,32 C106,32 104,36 104,40 C104,44 106,48 110,47 C112,47 113,44 113,40 C113,36 112,33 110,32 Z" fill="#111128"/>
+        <!-- Ear R -->
+        <path d="M170,32 C174,32 176,36 176,40 C176,44 174,48 170,47 C168,47 167,44 167,40 C167,36 168,33 170,32 Z" fill="#111128"/>
+
+        <!-- Clavicles -->
+        <path d="M127,97 C118,100 108,103 100,108" stroke="rgba(255,255,255,.07)" stroke-width="2" fill="none" stroke-linecap="round"/>
+        <path d="M153,97 C162,100 172,103 180,108" stroke="rgba(255,255,255,.07)" stroke-width="2" fill="none" stroke-linecap="round"/>
+
+        <!-- TORSO full silhouette -->
+        <path d="
+          M100,108
+          C88,112 76,120 70,132 C64,144 64,158 68,168
+          C56,176 48,192 46,208 C44,222 46,236 52,244
+          C46,250 40,262 40,276 C40,290 46,300 52,306
+          C48,320 46,338 48,356 C50,370 54,380 60,388
+          C56,400 52,418 54,438 C56,454 64,464 74,470
+          C78,484 82,504 86,524 C90,542 92,558 92,572
+          L108,572
+          C108,558 110,542 114,524 C118,504 122,484 126,472
+          C130,466 136,458 140,448
+          C144,458 150,466 154,472
+          C158,484 162,504 166,524
+          C170,542 172,558 172,572
+          L188,572
+          C188,558 190,542 194,524 C198,504 202,484 206,470
+          C216,464 224,454 226,438 C228,418 224,400 220,388
+          C226,380 230,370 232,356 C234,338 232,320 228,306
+          C234,300 240,290 240,276 C240,262 234,250 228,244
+          C234,236 236,222 234,208 C232,192 224,176 212,168
+          C216,158 216,144 210,132 C204,120 192,112 180,108
+          C170,104 160,100 153,97
+          L140,95
+          L127,97
+          C120,100 110,104 100,108 Z
+        " fill="url(#skinF)" filter="url(#bodyShad)"/>
+
+        <!-- ═══ MUSCLE OVERLAYS (front) ═══ -->
+
+        <!-- TRAPEZIUS upper (neck-to-shoulder) L -->
+        <path class="muscle" data-g="shoulders" onclick="sel('shoulders')" d="
+          M127,97 C120,100 110,104 100,108
+          C92,112 82,118 76,128
+          C84,130 94,130 102,126 C110,122 120,112 128,102 Z
+        "/>
+        <!-- TRAPEZIUS upper R -->
+        <path class="muscle" data-g="shoulders" onclick="sel('shoulders')" d="
+          M153,97 C160,100 170,104 180,108
+          C188,112 198,118 204,128
+          C196,130 186,130 178,126 C170,122 160,112 152,102 Z
+        "/>
+
+        <!-- ANTERIOR DELTOID L -->
+        <path class="muscle" data-g="shoulders" onclick="sel('shoulders')" d="
+          M70,132 C62,140 56,152 56,164 C56,174 60,182 68,186
+          C74,180 78,170 80,158 C82,148 80,136 76,130 Z
+        "/>
+        <!-- ANTERIOR DELTOID R -->
+        <path class="muscle" data-g="shoulders" onclick="sel('shoulders')" d="
+          M210,132 C218,140 224,152 224,164 C224,174 220,182 212,186
+          C206,180 202,170 200,158 C198,148 200,136 204,130 Z
+        "/>
+
+        <!-- PECTORALIS MAJOR L (fan shape) -->
+        <path class="muscle" data-g="chest" onclick="sel('chest')" d="
+          M100,108 C90,114 82,124 80,138
+          C78,150 80,164 86,172 C94,180 106,180 116,174
+          C124,168 130,156 132,142 C134,128 130,114 124,108
+          L140,106 L140,96 L128,98 Z
+        "/>
+        <!-- PECTORALIS MAJOR R -->
+        <path class="muscle" data-g="chest" onclick="sel('chest')" d="
+          M180,108 C190,114 198,124 200,138
+          C202,150 200,164 194,172 C186,180 174,180 164,174
+          C156,168 150,156 148,142 C146,128 150,114 156,108
+          L140,106 L140,96 L152,98 Z
+        "/>
+        <!-- Sternal line -->
+        <line x1="140" y1="106" x2="140" y2="182" stroke="rgba(255,255,255,.05)" stroke-width="1.5"/>
+        <!-- Lower pec fold -->
+        <path d="M88,172 Q140,190 192,172" stroke="rgba(255,255,255,.06)" stroke-width="1.5" fill="none"/>
+
+        <!-- BICEPS BRACHII L -->
+        <path class="muscle" data-g="biceps" onclick="sel('biceps')" d="
+          M56,166 C48,178 42,196 42,214
+          C42,228 46,240 56,246 C64,250 72,246 76,236
+          C80,224 80,206 76,190 C74,180 68,170 62,166 Z
+        "/>
+        <!-- BICEPS R -->
+        <path class="muscle" data-g="biceps" onclick="sel('biceps')" d="
+          M224,166 C232,178 238,196 238,214
+          C238,228 234,240 224,246 C216,250 208,246 204,236
+          C200,224 200,206 204,190 C206,180 212,170 218,166 Z
+        "/>
+
+        <!-- TRICEPS lateral head L (visible from front, outer arm) -->
+        <path class="muscle" data-g="triceps" onclick="sel('triceps')" d="
+          M58,168 C50,180 46,196 46,212 C46,224 50,234 58,240
+          C62,234 64,222 64,208 C64,194 62,180 58,168 Z
+        "/>
+        <!-- TRICEPS lateral R -->
+        <path class="muscle" data-g="triceps" onclick="sel('triceps')" d="
+          M222,168 C230,180 234,196 234,212 C234,224 230,234 222,240
+          C218,234 216,222 216,208 C216,194 218,180 222,168 Z
+        "/>
+
+        <!-- FOREARM L -->
+        <path class="muscle" data-g="forearm" onclick="sel('forearm')" d="M44,246 C38,262 36,282 38,300 C40,314 46,322 56,324 C66,324 74,316 76,302 C78,288 76,268 72,252 Z" fill="#0e0c20" stroke="rgba(255,255,255,.06)" stroke-width=".5"/>
+        <!-- FOREARM R -->
+        <path class="muscle" data-g="forearm" onclick="sel('forearm')" d="M236,246 C242,262 244,282 242,300 C240,314 234,322 224,324 C214,324 206,316 204,302 C202,288 204,268 208,252 Z" fill="#0e0c20" stroke="rgba(255,255,255,.06)" stroke-width=".5"/>
+        <!-- Hands -->
+        <ellipse cx="56" cy="330" rx="16" ry="11" fill="#0c0b1c"/>
+        <ellipse cx="224" cy="330" rx="16" ry="11" fill="#0c0b1c"/>
+
+        <!-- SERRATUS ANTERIOR L (finger-like) -->
+        <path class="muscle" data-g="abs" onclick="sel('abs')" d="
+          M80,172 C74,182 70,196 72,210 C74,220 80,226 88,224
+          C92,214 92,198 88,186 C86,180 84,174 80,172 Z
+        "/>
+        <!-- SERRATUS R -->
+        <path class="muscle" data-g="abs" onclick="sel('abs')" d="
+          M200,172 C206,182 210,196 208,210 C206,220 200,226 192,224
+          C188,214 188,198 192,186 C194,180 196,174 200,172 Z
+        "/>
+
+        <!-- EXTERNAL OBLIQUE L -->
+        <path class="muscle" data-g="abs" onclick="sel('abs')" d="
+          M80,196 C72,210 68,228 70,246 C72,260 80,268 90,266
+          C96,256 98,240 96,224 C94,210 88,198 80,196 Z
+        "/>
+        <!-- EXTERNAL OBLIQUE R -->
+        <path class="muscle" data-g="abs" onclick="sel('abs')" d="
+          M200,196 C208,210 212,228 210,246 C208,260 200,268 190,266
+          C184,256 182,240 184,224 C186,210 192,198 200,196 Z
+        "/>
+
+        <!-- RECTUS ABDOMINIS — 6 blocks -->
+        <!-- Row 1 -->
+        <path class="muscle" data-g="abs" onclick="sel('abs')" d="M118,182 C114,184 112,192 113,202 C114,208 118,212 124,212 C128,210 130,204 130,196 C130,188 126,182 118,182 Z"/>
+        <path class="muscle" data-g="abs" onclick="sel('abs')" d="M162,182 C166,184 168,192 167,202 C166,208 162,212 156,212 C152,210 150,204 150,196 C150,188 154,182 162,182 Z"/>
+        <!-- Row 2 -->
+        <path class="muscle" data-g="abs" onclick="sel('abs')" d="M116,218 C112,220 110,230 111,242 C112,250 116,256 123,256 C128,254 130,248 130,240 C130,230 126,218 116,218 Z"/>
+        <path class="muscle" data-g="abs" onclick="sel('abs')" d="M164,218 C168,220 170,230 169,242 C168,250 164,256 157,256 C152,254 150,248 150,240 C150,230 154,218 164,218 Z"/>
+        <!-- Row 3 -->
+        <path class="muscle" data-g="abs" onclick="sel('abs')" d="M116,262 C112,264 110,276 112,288 C114,298 118,304 125,304 C130,302 132,296 132,288 C132,278 128,262 116,262 Z"/>
+        <path class="muscle" data-g="abs" onclick="sel('abs')" d="M164,262 C168,264 170,276 168,288 C166,298 162,304 155,304 C150,302 148,296 148,288 C148,278 152,262 164,262 Z"/>
+        <!-- Linea alba -->
+        <line x1="140" y1="180" x2="140" y2="308" stroke="rgba(255,255,255,.045)" stroke-width="1.5"/>
+        <!-- Tendinous inscriptions -->
+        <path d="M114,214 Q140,218 166,214" stroke="rgba(255,255,255,.04)" stroke-width="1" fill="none"/>
+        <path d="M112,260 Q140,264 168,260" stroke="rgba(255,255,255,.04)" stroke-width="1" fill="none"/>
+
+        <!-- ILIOPSOAS / HIP FLEXORS -->
+        <path d="M104,308 Q120,316 140,318 Q160,316 176,308 L174,332 Q158,340 140,342 Q122,340 106,332 Z" fill="#0f0e24" stroke="rgba(255,255,255,.04)" stroke-width=".5"/>
+
+        <!-- TENSOR FASCIAE LATAE L -->
+        <path class="muscle" data-g="quads" onclick="sel('quads')" d="M90,332 C82,342 78,356 80,368 C82,376 88,380 96,378 C102,372 104,360 102,348 C100,338 96,332 90,332 Z"/>
+        <!-- TFL R -->
+        <path class="muscle" data-g="quads" onclick="sel('quads')" d="M190,332 C198,342 202,356 200,368 C198,376 192,380 184,378 C178,372 176,360 178,348 C180,338 184,332 190,332 Z"/>
+
+        <!-- VASTUS LATERALIS L (outer thigh) -->
+        <path class="muscle" data-g="quads" onclick="sel('quads')" d="
+          M80,338 C70,358 64,382 62,408 C60,428 64,446 74,456
+          C84,462 96,458 104,446 C112,432 114,408 110,382
+          C108,362 102,344 94,336 Z
+        "/>
+        <!-- RECTUS FEMORIS L (middle front) -->
+        <path class="muscle" data-g="quads" onclick="sel('quads')" d="
+          M104,332 C100,352 98,378 100,406 C102,426 108,442 118,448
+          C126,452 134,448 138,438 C142,426 140,404 136,378
+          C132,354 126,336 118,330 Z
+        "/>
+        <!-- VASTUS MEDIALIS L (inner teardrop) -->
+        <path class="muscle" data-g="quads" onclick="sel('quads')" d="
+          M140,378 C136,396 134,416 136,434 C138,448 144,456 152,456
+          C158,452 160,440 158,424 C156,408 150,390 142,380 Z
+        "/>
+
+        <!-- VASTUS LATERALIS R -->
+        <path class="muscle" data-g="quads" onclick="sel('quads')" d="
+          M200,338 C210,358 216,382 218,408 C220,428 216,446 206,456
+          C196,462 184,458 176,446 C168,432 166,408 170,382
+          C172,362 178,344 186,336 Z
+        "/>
+        <!-- RECTUS FEMORIS R -->
+        <path class="muscle" data-g="quads" onclick="sel('quads')" d="
+          M176,332 C180,352 182,378 180,406 C178,426 172,442 162,448
+          C154,452 146,448 142,438 C138,426 140,404 144,378
+          C148,354 154,336 162,330 Z
+        "/>
+        <!-- VASTUS MEDIALIS R -->
+        <path class="muscle" data-g="quads" onclick="sel('quads')" d="
+          M140,378 C144,396 146,416 144,434 C142,448 136,456 128,456
+          C122,452 120,440 122,424 C124,408 130,390 138,380 Z
+        "/>
+
+        <!-- Patella L -->
+        <ellipse cx="100" cy="460" rx="18" ry="13" fill="#0d0c22" stroke="rgba(255,255,255,.07)" stroke-width=".5"/>
+        <!-- Patella R -->
+        <ellipse cx="180" cy="460" rx="18" ry="13" fill="#0d0c22" stroke="rgba(255,255,255,.07)" stroke-width=".5"/>
+
+        <!-- TIBIALIS ANTERIOR L -->
+        <path class="muscle" data-g="calves" onclick="sel('calves')" d="M86,476 C80,494 78,514 80,532 C82,544 88,550 96,550 C102,548 106,540 106,528 C106,512 102,492 96,476 Z"/>
+        <!-- TIBIALIS ANTERIOR R -->
+        <path class="muscle" data-g="calves" onclick="sel('calves')" d="M194,476 C200,494 202,514 200,532 C198,544 192,550 184,550 C178,548 174,540 174,528 C174,512 178,492 184,476 Z"/>
+
+        <!-- GASTROCNEMIUS L (inner/outer heads) -->
+        <path class="muscle" data-g="calves" onclick="sel('calves')" d="
+          M82,476 C74,494 70,518 72,540 C74,556 80,564 90,566
+          C100,566 108,558 112,544 C116,528 114,504 108,482 Z
+        "/>
+        <!-- GASTROC R -->
+        <path class="muscle" data-g="calves" onclick="sel('calves')" d="
+          M198,476 C206,494 210,518 208,540 C206,556 200,564 190,566
+          C180,566 172,558 168,544 C164,528 166,504 172,482 Z
+        "/>
+
+        <!-- Ankle + feet -->
+        <ellipse cx="92" cy="570" rx="17" ry="8" fill="#0a0918"/>
+        <ellipse cx="188" cy="570" rx="17" ry="8" fill="#0a0918"/>
+        <path d="M74,574 C72,578 70,582 72,584 C80,588 104,588 108,584 C110,580 108,574 102,572 Z" fill="#0a0918"/>
+        <path d="M206,574 C208,578 210,582 208,584 C200,588 176,588 172,584 C170,580 172,574 178,572 Z" fill="#0a0918"/>
+      </svg>
+
+      <!-- ===================== LEFT SIDE VIEW (90°) ===================== -->
+      <svg id="svL" class="figure" viewBox="0 0 280 600" xmlns="http://www.w3.org/2000/svg" style="display:none">
+        <defs>
+          <linearGradient id="skinL" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#1a1830"/>
+            <stop offset="100%" stop-color="#0d0c1c"/>
+          </linearGradient>
+        </defs>
+
+        <!-- Head side -->
+        <ellipse cx="140" cy="38" rx="32" ry="36" fill="#13122a"/>
+        <path d="M132,70 C130,80 132,90 140,93 C148,90 150,80 148,70 Z" fill="#13122a"/>
+        <path d="M170,35 C174,35 176,40 176,45 C176,50 172,54 168,53 Z" fill="#111128"/>
+
+        <!-- Torso side silhouette -->
+        <path d="
+          M108,108 C96,112 86,120 80,132 C74,144 74,158 78,168
+          C66,176 58,192 56,208 C54,222 56,236 62,244
+          C56,250 50,262 50,276 C50,290 56,300 62,306
+          C58,320 56,338 58,356 C60,370 64,380 70,388
+          C66,400 62,418 64,438 C66,454 74,464 84,470
+          C88,484 92,504 96,524 C100,542 102,558 102,572 L124,572
+          C124,558 126,542 130,524 C134,504 138,484 142,470
+          C148,464 154,456 158,448
+          C162,458 168,466 172,472
+          C176,484 180,504 184,524
+          C188,542 190,558 190,572 L208,572
+          C208,558 210,542 214,524
+          C218,504 222,484 226,470
+          C232,464 238,454 240,438
+          C242,418 238,400 234,388
+          C240,380 244,370 246,356
+          C248,338 246,320 242,306
+          C248,300 254,290 254,276
+          C254,262 248,250 242,244
+          C248,236 250,222 248,208
+          C246,192 238,176 226,168
+          C230,158 230,144 224,132
+          C218,120 206,112 194,108
+          C184,104 174,100 168,97 L155,95 L142,93 L128,97
+          C118,100 108,104 108,108 Z
+        " fill="url(#skinL)" filter="url(#bodyShad)"/>
+
+        <!-- LATISSIMUS DORSI (side view - large wing) -->
+        <path class="muscle sec" data-g="lats" onclick="sel('lats')" d="
+          M100,130 C88,148 76,172 72,200 C68,224 70,248 82,260
+          C92,270 108,268 118,254 C126,240 130,216 128,190
+          C126,164 118,140 106,128 Z
+        "/>
+
+        <!-- EXTERNAL OBLIQUE (side - prominent) -->
+        <path class="muscle" data-g="abs" onclick="sel('abs')" d="
+          M104,180 C94,194 88,212 90,232 C92,248 100,256 112,254
+          C120,246 124,228 122,208 C120,190 112,182 104,180 Z
+        "/>
+
+        <!-- SERRATUS ANTERIOR (ribs side) -->
+        <path class="muscle" data-g="abs" onclick="sel('abs')" d="
+          M116,160 C108,170 104,184 106,198 C108,210 114,216 122,214
+          C128,206 130,190 128,176 C126,164 120,158 116,160 Z
+        "/>
+
+        <!-- RECTUS ABDOMINIS side -->
+        <path class="muscle" data-g="abs" onclick="sel('abs')" d="
+          M134,180 C130,196 128,216 130,238 C132,254 138,260 146,258
+          C152,250 154,232 152,210 C150,190 142,178 134,180 Z
+        "/>
+
+        <!-- ILIOPSOAS -->
+        <path d="M124,268 Q140,276 156,274 L154,296 Q138,304 122,300 Z" fill="#0f0e24" stroke="rgba(255,255,255,.04)" stroke-width=".5"/>
+
+        <!-- TENSOR FASCIAE LATAE -->
+        <path class="muscle" data-g="quads" onclick="sel('quads')" d="
+          M112,296 C104,308 100,324 102,340 C104,350 110,354 120,352
+          C128,346 130,332 128,316 C124,304 118,296 112,296 Z
+        "/>
+
+        <!-- VASTUS LATERALIS side -->
+        <path class="muscle" data-g="quads" onclick="sel('quads')" d="
+          M104,304 C92,328 84,358 82,390 C80,416 86,436 98,448
+          C112,456 128,450 138,434 C146,418 146,390 140,362
+          C136,336 126,310 114,302 Z
+        "/>
+
+        <!-- RECTUS FEMORIS side -->
+        <path class="muscle" data-g="quads" onclick="sel('quads')" d="
+          M130,298 C124,322 122,352 126,384 C130,408 138,422 150,426
+          C160,428 168,420 172,406 C176,388 172,360 166,334
+          C160,308 148,296 138,296 Z
+        "/>
+
+        <!-- VASTUS MEDIALIS -->
+        <path class="muscle" data-g="quads" onclick="sel('quads')" d="
+          M172,362 C176,380 178,400 176,420 C174,434 168,442 158,442
+          C148,438 146,422 148,402 C150,382 156,368 164,360 Z
+        "/>
+
+        <!-- Patella -->
+        <ellipse cx="130" cy="456" rx="20" ry="14" fill="#0d0c22" stroke="rgba(255,255,255,.07)" stroke-width=".5"/>
+
+        <!-- TIBIALIS ANTERIOR -->
+        <path class="muscle" data-g="calves" onclick="sel('calves')" d="
+          M116,474 C110,494 108,516 110,536 C112,550 118,556 128,556
+          C136,554 140,544 140,528 C138,508 130,488 124,472 Z
+        "/>
+
+        <!-- GASTROCNEMIUS MEDIALIS -->
+        <path class="muscle" data-g="calves" onclick="sel('calves')" d="
+          M112,474 C104,494 100,520 102,544 C104,560 112,568 124,570
+          C136,570 144,560 148,544 C150,520 146,494 138,474 Z
+        "/>
+
+        <!-- GASTROCNEMIUS LATERALIS -->
+        <path class="muscle" data-g="calves" onclick="sel('calves')" d="
+          M140,476 C148,494 152,518 150,540 C148,556 142,562 132,562
+          C122,560 116,552 114,536 C112,514 114,492 120,476 Z
+        "/>
+
+        <!-- Ankle + foot side -->
+        <ellipse cx="122" cy="570" rx="20" ry="9" fill="#0a0918"/>
+        <path d="M102,574 C100,578 98,582 100,584 C110,590 136,590 142,584 C144,580 140,572 132,570 Z" fill="#0a0918"/>
+
+        <!-- ARM SIDE -->
+        <!-- Deltoid side -->
+        <path class="muscle" data-g="shoulders" onclick="sel('shoulders')" d="
+          M82,120 C72,132 64,148 64,166 C64,180 70,190 80,194
+          C90,190 98,178 100,164 C102,148 96,132 88,120 Z
+        "/>
+
+        <!-- Triceps side (prominent) -->
+        <path class="muscle" data-g="triceps" onclick="sel('triceps')" d="
+          M74,158 C62,176 54,200 54,226 C54,248 60,264 72,272
+          C84,276 94,268 100,252 C106,234 104,208 98,184 C94,166 84,156 74,158 Z
+        "/>
+
+        <!-- Biceps side -->
+        <path class="muscle" data-g="biceps" onclick="sel('biceps')" d="
+          M78,160 C66,178 58,200 58,224 C58,244 66,258 80,264
+          C92,268 102,258 106,242 C110,224 106,198 100,178 C96,164 86,158 78,160 Z
+        "/>
+
+        <!-- Forearm side -->
+        <path class="muscle" data-g="forearm" onclick="sel('forearm')" d="M52,268 C44,286 40,308 42,328 C44,344 52,354 64,356 C76,356 86,346 88,328 C90,306 84,284 76,266 Z" fill="#0c0b1e" stroke="rgba(255,255,255,.05)" stroke-width=".5"/>
+        <ellipse cx="70" cy="362" rx="18" ry="11" fill="#0a0918"/>
+      </svg>
+
+      <!-- ===================== RIGHT SIDE VIEW (270°) ===================== -->
+      <svg id="svR" class="figure" viewBox="0 0 280 600" xmlns="http://www.w3.org/2000/svg" style="display:none">
+        <defs>
+          <linearGradient id="skinR" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#1c1a32"/>
+            <stop offset="100%" stop-color="#0b0a1a"/>
+          </linearGradient>
+        </defs>
+
+        <!-- Head side -->
+        <ellipse cx="140" cy="38" rx="32" ry="36" fill="#13122a"/>
+        <path d="M132,70 C130,80 132,90 140,93 C148,90 150,80 148,70 Z" fill="#13122a"/>
+        <path d="M104" fill="#111128"/>
+
+        <!-- Torso side silhouette (mirrored) -->
+        <path d="
+          M172,108 C184,112 194,120 200,132 C206,144 206,158 202,168
+          C214,176 222,192 224,208 C226,222 224,236 218,244
+          C224,250 230,262 230,276 C230,290 224,300 218,306
+          C222,320 224,338 222,356 C220,370 216,380 210,388
+          C214,400 218,418 216,438 C214,454 206,464 196,470
+          C192,484 188,504 184,524 C180,542 178,558 178,572 L156,572
+          C156,558 154,542 150,524 C146,504 142,484 138,470
+          C132,464 126,456 122,448
+          C118,458 112,466 108,472
+          C104,484 100,504 96,524
+          C92,542 90,558 90,572 L72,572
+          C72,558 70,542 66,524
+          C62,504 58,484 54,470
+          C48,464 42,454 40,438
+          C38,418 42,400 46,388
+          C40,380 36,370 34,356
+          C32,338 34,320 38,306
+          C32,300 26,290 26,276
+          C26,262 32,250 38,244
+          C32,236 30,222 32,208
+          C34,192 42,176 54,168
+          C50,158 50,144 56,132
+          C62,120 74,112 86,108
+          C96,104 106,100 112,97 L125,95 L138,93 L152,97
+          C162,100 172,104 172,108 Z
+        " fill="url(#skinR)" filter="url(#bodyShad)"/>
+
+        <!-- LATISSIMUS DORSI (side view) -->
+        <path class="muscle sec" data-g="lats" onclick="sel('lats')" d="
+          M180,130 C192,148 204,172 208,200 C212,224 210,248 198,260
+          C188,270 172,268 162,254
+          C154,240 150,216 152,190
+          C154,164 162,140 174,128 Z
+        "/>
+
+        <!-- EXTERNAL OBLIQUE -->
+        <path class="muscle" data-g="abs" onclick="sel('abs')" d="
+          M176,180 C186,194 192,212 190,232 C188,248 180,256 168,254
+          C160,246 156,228 158,208 C160,190 168,182 176,180 Z
+        "/>
+
+        <!-- SERRATUS ANTERIOR -->
+        <path class="muscle" data-g="abs" onclick="sel('abs')" d="
+          M164,160 C172,170 176,184 174,198 C172,210 166,216 158,214
+          C152,206 150,190 152,176 C154,164 160,158 164,160 Z
+        "/>
+
+        <!-- RECTUS ABDOMINIS side -->
+        <path class="muscle" data-g="abs" onclick="sel('abs')" d="
+          M146,180 C150,196 152,216 150,238 C148,254 142,260 134,258
+          C128,250 126,232 128,210 C130,190 138,178 146,180 Z
+        "/>
+
+        <!-- ILIOPSOAS -->
+        <path d="M156,268 Q140,276 124,274 L126,296 Q142,304 158,300 Z" fill="#0f0e24" stroke="rgba(255,255,255,.04)" stroke-width=".5"/>
+
+        <!-- TENSOR FASCIAE LATAE -->
+        <path class="muscle" data-g="quads" onclick="sel('quads')" d="
+          M168,296 C176,308 180,324 178,340 C176,350 170,354 160,352
+          C152,346 150,332 152,316 C156,304 162,296 168,296 Z
+        "/>
+
+        <!-- VASTUS LATERALIS -->
+        <path class="muscle" data-g="quads" onclick="sel('quads')" d="
+          M176,304 C188,328 196,358 198,390 C200,416 194,436 182,448
+          C168,456 152,450 142,434 C134,418 134,390 140,362
+          C144,336 154,310 166,302 Z
+        "/>
+
+        <!-- RECTUS FEMORIS -->
+        <path class="muscle" data-g="quads" onclick="sel('quads')" d="
+          M150,298 C156,322 158,352 154,384 C150,408 142,422 130,426
+          C120,428 112,420 108,406 C104,388 108,360 114,334
+          C120,308 132,296 142,296 Z
+        "/>
+
+        <!-- VASTUS MEDIALIS -->
+        <path class="muscle" data-g="quads" onclick="sel('quads')" d="
+          M108,362 C104,380 102,400 104,420 C106,434 112,442 122,442
+          C132,438 134,422 132,402 C130,382 124,368 116,360 Z
+        "/>
+
+        <!-- Patella -->
+        <ellipse cx="150" cy="456" rx="20" ry="14" fill="#0d0c22" stroke="rgba(255,255,255,.07)" stroke-width=".5"/>
+
+        <!-- TIBIALIS ANTERIOR -->
+        <path class="muscle" data-g="calves" onclick="sel('calves')" d="
+          M164,474 C170,494 172,516 170,536 C168,550 162,556 152,556
+          C144,554 140,544 140,528 C142,508 150,488 156,472 Z
+        "/>
+
+        <!-- GASTROCNEMIUS MEDIALIS -->
+        <path class="muscle" data-g="calves" onclick="sel('calves')" d="
+          M168,474 C176,494 180,520 178,544 C176,560 168,568 156,570
+          C144,570 136,560 132,544 C130,520 134,494 142,474 Z
+        "/>
+
+        <!-- GASTROCNEMIUS LATERALIS -->
+        <path class="muscle" data-g="calves" onclick="sel('calves')" d="
+          M140,476 C132,494 128,518 130,540 C132,556 138,562 148,562
+          C158,560 164,552 166,536 C168,514 166,492 160,476 Z
+        "/>
+
+        <!-- Ankle + foot side -->
+        <ellipse cx="158" cy="570" rx="20" ry="9" fill="#0a0918"/>
+        <path d="M178,574 C180,578 182,582 180,584 C170,590 144,590 138,584 C136,580 140,572 148,570 Z" fill="#0a0918"/>
+
+        <!-- ARM SIDE -->
+        <!-- Deltoid side -->
+        <path class="muscle" data-g="shoulders" onclick="sel('shoulders')" d="
+          M198,120 C208,132 216,148 216,166 C216,180 210,190 200,194
+          C190,190 182,178 180,164 C178,148 184,132 192,120 Z
+        "/>
+
+        <!-- Triceps side -->
+        <path class="muscle" data-g="triceps" onclick="sel('triceps')" d="
+          M206,158 C218,176 226,200 226,226 C226,248 220,264 208,272
+          C196,276 186,268 180,252 C174,234 176,208 182,184 C186,166 196,156 206,158 Z
+        "/>
+
+        <!-- Biceps side -->
+        <path class="muscle" data-g="biceps" onclick="sel('biceps')" d="
+          M202,160 C214,178 222,200 222,224 C222,244 214,258 200,264
+          C188,268 178,258 174,242 C170,224 174,198 180,178 C184,164 194,158 202,160 Z
+        "/>
+
+        <!-- Forearm side -->
+        <path class="muscle" data-g="forearm" onclick="sel('forearm')" d="M228,268 C236,286 240,308 238,328 C236,344 228,354 216,356 C204,356 194,346 192,328 C190,306 196,284 204,266 Z" fill="#0c0b1e" stroke="rgba(255,255,255,.05)" stroke-width=".5"/>
+        <ellipse cx="210" cy="362" rx="18" ry="11" fill="#0a0918"/>
+      </svg>
+
+      <!-- ===================== BACK VIEW ===================== -->
+      <svg id="svB" class="figure" viewBox="0 0 280 600" xmlns="http://www.w3.org/2000/svg" style="display:none">
+        <defs>
+          <linearGradient id="skinB" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="#1c1a34"/>
+            <stop offset="100%" stop-color="#0c0b1e"/>
+          </linearGradient>
+        </defs>
+
+        <!-- Head back -->
+        <ellipse cx="140" cy="38" rx="30" ry="36" fill="#13122a"/>
+        <path d="M126,70 C124,80 124,90 140,93 C156,90 156,80 154,70 Z" fill="#13122a"/>
+        <path d="M110,32 C106,32 104,36 104,40 C104,44 106,48 110,47 Z" fill="#111128"/>
+        <path d="M170,32 C174,32 176,36 176,40 C176,44 174,48 170,47 Z" fill="#111128"/>
+
+        <!-- Back torso silhouette -->
+        <path d="
+          M100,108 C88,112 76,120 70,132 C64,144 64,158 68,168
+          C56,176 48,192 46,208 C44,222 46,236 52,244
+          C46,250 40,262 40,276 C40,290 46,300 52,306
+          C48,320 46,338 48,356 C50,370 54,380 60,388
+          C56,400 52,418 54,438 C56,454 64,464 74,470
+          C78,484 82,504 86,524 C90,542 92,558 92,572 L108,572
+          C108,558 110,542 114,524 C118,504 122,484 126,472
+          C130,464 136,456 140,448
+          C144,456 150,464 154,472
+          C158,484 162,504 166,524 C170,542 172,558 172,572 L188,572
+          C188,558 190,542 194,524 C198,504 202,484 206,470
+          C216,464 224,454 226,438 C228,418 224,400 220,388
+          C226,380 230,370 232,356 C234,338 232,320 228,306
+          C234,300 240,290 240,276 C240,262 234,250 228,244
+          C234,236 236,222 234,208 C232,192 224,176 212,168
+          C216,158 216,144 210,132 C204,120 192,112 180,108
+          C170,104 160,100 153,97 L140,95 L127,97
+          C120,100 110,104 100,108 Z
+        " fill="url(#skinB)" filter="url(#bodyShad)"/>
+
+        <!-- TRAPEZIUS (full diamond back) -->
+        <path class="muscle" data-g="shoulders" onclick="sel('shoulders')" d="
+          M140,74 C128,76 112,84 102,96 C94,106 92,120 98,132
+          C106,142 120,146 134,140 C140,128 146,114 140,100
+          C134,114 140,128 146,140
+          C160,146 174,142 182,132
+          C188,120 186,106 178,96
+          C168,84 152,76 140,74 Z
+        "/>
+        <!-- Trap detail line -->
+        <line x1="140" y1="78" x2="140" y2="142" stroke="rgba(255,255,255,.06)" stroke-width="1"/>
+        <path d="M106,118 Q140,126 174,118" stroke="rgba(255,255,255,.05)" stroke-width="1" fill="none"/>
+
+        <!-- POSTERIOR DELTOID L -->
+        <path class="muscle" data-g="shoulders" onclick="sel('shoulders')" d="
+          M70,132 C62,142 56,156 56,170 C56,180 60,188 68,192
+          C74,186 78,174 80,162 C82,150 80,138 76,130 Z
+        "/>
+        <!-- POSTERIOR DELTOID R -->
+        <path class="muscle" data-g="shoulders" onclick="sel('shoulders')" d="
+          M210,132 C218,142 224,156 224,170 C224,180 220,188 212,192
+          C206,186 202,174 200,162 C198,150 200,138 204,130 Z
+        "/>
+
+        <!-- INFRASPINATUS / TERES MAJOR L -->
+        <path class="muscle" data-g="shoulders" onclick="sel('shoulders')" d="
+          M100,136 C90,146 84,160 84,174 C84,184 88,192 96,196
+          C104,192 110,182 112,170 C114,158 110,146 104,138 Z
+        "/>
+        <!-- INFRASPINATUS R -->
+        <path class="muscle" data-g="shoulders" onclick="sel('shoulders')" d="
+          M180,136 C190,146 196,160 196,174 C196,184 192,192 184,196
+          C176,192 170,182 168,170 C166,158 170,146 176,138 Z
+        "/>
+
+        <!-- LATISSIMUS DORSI L (wing) -->
+        <path class="muscle sec" data-g="lats" onclick="sel('lats')" d="
+          M96,144 C84,160 74,182 70,208 C66,230 68,252 80,264
+          C90,272 104,270 114,258 C122,246 126,224 126,200
+          C126,176 120,154 110,142 Z
+        "/>
+        <!-- LATS R -->
+        <path class="muscle sec" data-g="lats" onclick="sel('lats')" d="
+          M184,144 C196,160 206,182 210,208 C214,230 212,252 200,264
+          C190,272 176,270 166,258 C158,246 154,224 154,200
+          C154,176 160,154 170,142 Z
+        "/>
+
+        <!-- ERECTOR SPINAE (spine columns) L -->
+        <path class="muscle sec" data-g="lats" onclick="sel('lats')" d="M126,148 C122,160 120,180 122,206 C124,224 128,238 134,244 C136,234 136,214 136,192 C136,172 132,152 126,148 Z"/>
+        <!-- ERECTOR R -->
+        <path class="muscle sec" data-g="lats" onclick="sel('lats')" d="M154,148 C158,160 160,180 158,206 C156,224 152,238 146,244 C144,234 144,214 144,192 C144,172 148,152 154,148 Z"/>
+        <!-- Spine groove -->
+        <line x1="140" y1="148" x2="140" y2="300" stroke="rgba(255,255,255,.04)" stroke-width="1.5"/>
+
+        <!-- TRICEPS LONG HEAD L -->
+        <path class="muscle" data-g="triceps" onclick="sel('triceps')" d="
+          M58,170 C48,186 42,208 42,230 C42,248 46,262 56,268
+          C64,272 72,266 76,254 C80,240 80,218 76,198 C74,184 66,172 58,170 Z
+        "/>
+        <!-- TRICEPS R -->
+        <path class="muscle" data-g="triceps" onclick="sel('triceps')" d="
+          M222,170 C232,186 238,208 238,230 C238,248 234,262 224,268
+          C216,272 208,266 204,254 C200,240 200,218 204,198 C206,184 214,172 222,170 Z
+        "/>
+
+        <!-- Forearms back -->
+        <path d="M42,270 C36,288 34,310 36,328 C38,342 46,350 56,350 C66,350 74,342 76,328 C78,312 76,292 70,274 Z" fill="#0c0b1e" stroke="rgba(255,255,255,.05)" stroke-width=".5"/>
+        <path d="M238,270 C244,288 246,310 244,328 C242,342 234,350 224,350 C214,350 206,342 204,328 C202,312 204,292 210,274 Z" fill="#0c0b1e" stroke="rgba(255,255,255,.05)" stroke-width=".5"/>
+        <ellipse cx="56" cy="356" rx="16" ry="10" fill="#0a0918"/>
+        <ellipse cx="224" cy="356" rx="16" ry="10" fill="#0a0918"/>
+
+        <!-- Lower back / Lumbar -->
+        <path d="M116,270 Q140,280 164,270 L162,310 Q140,320 118,310 Z" fill="#0e0d22" stroke="rgba(255,255,255,.04)" stroke-width=".5"/>
+
+        <!-- GLUTEUS MEDIUS L (upper glute) -->
+        <path class="muscle sec" data-g="glutes" onclick="sel('glutes')" d="
+          M74,310 C64,324 58,342 60,360 C62,374 70,382 82,382
+          C92,380 100,370 102,356 C104,342 100,326 92,316 Z
+        "/>
+        <!-- GLUTEUS MEDIUS R -->
+        <path class="muscle sec" data-g="glutes" onclick="sel('glutes')" d="
+          M206,310 C216,324 222,342 220,360 C218,374 210,382 198,382
+          C188,380 180,370 178,356 C176,342 180,326 188,316 Z
+        "/>
+
+        <!-- GLUTEUS MAXIMUS L (big round) -->
+        <path class="muscle sec" data-g="glutes" onclick="sel('glutes')" d="
+          M74,340 C62,358 56,380 58,402 C60,420 70,434 84,440
+          C98,446 114,440 122,428 C130,414 130,392 124,370
+          C118,350 108,336 96,330 Z
+        "/>
+        <!-- GLUTEUS MAXIMUS R -->
+        <path class="muscle sec" data-g="glutes" onclick="sel('glutes')" d="
+          M206,340 C218,358 224,380 222,402 C220,420 210,434 196,440
+          C182,446 166,440 158,428 C150,414 150,392 156,370
+          C162,350 172,336 184,330 Z
+        "/>
+        <!-- Gluteal fold -->
+        <path d="M72,440 Q140,456 208,440" stroke="rgba(255,255,255,.07)" stroke-width="2" fill="none"/>
+
+        <!-- BICEPS FEMORIS (hamstrings outer) L -->
+        <path class="muscle sec" data-g="quads" onclick="sel('quads')" d="
+          M78,448 C68,470 62,498 62,524 C62,542 68,556 80,562
+          C92,566 104,558 110,542 C116,524 116,496 108,470
+          C104,456 96,446 86,444 Z
+        "/>
+        <!-- SEMITENDINOSUS (inner hamstring) L -->
+        <path class="muscle sec" data-g="quads" onclick="sel('quads')" d="
+          M110,446 C106,468 104,496 106,522 C108,540 116,552 126,554
+          C136,554 142,544 142,530 C142,510 138,484 130,460 Z
+        "/>
+        <!-- BICEPS FEMORIS R -->
+        <path class="muscle sec" data-g="quads" onclick="sel('quads')" d="
+          M202,448 C212,470 218,498 218,524 C218,542 212,556 200,562
+          C188,566 176,558 170,542 C164,524 164,496 172,470
+          C176,456 184,446 194,444 Z
+        "/>
+        <!-- SEMITENDINOSUS R -->
+        <path class="muscle sec" data-g="quads" onclick="sel('quads')" d="
+          M170,446 C174,468 176,496 174,522 C172,540 164,552 154,554
+          C144,554 138,544 138,530 C138,510 142,484 150,460 Z
+        "/>
+
+        <!-- Knees back -->
+        <ellipse cx="96" cy="564" rx="20" ry="13" fill="#0d0c22" stroke="rgba(255,255,255,.06)" stroke-width=".5"/>
+        <ellipse cx="184" cy="564" rx="20" ry="13" fill="#0d0c22" stroke="rgba(255,255,255,.06)" stroke-width=".5"/>
+
+        <!-- GASTROCNEMIUS back L (two heads) -->
+        <path class="muscle" data-g="calves" onclick="sel('calves')" d="
+          M76,578 C68,598 66,622 68,642 C70,658 78,666 90,668
+          C102,668 110,658 114,642 C118,624 116,598 108,578 Z
+        "/>
+        <!-- GASTROC back R -->
+        <path class="muscle" data-g="calves" onclick="sel('calves')" d="
+          M204,578 C212,598 214,622 212,642 C210,658 202,666 190,668
+          C178,668 170,658 166,642 C162,624 164,598 172,578 Z
+        "/>
+        <!-- Achilles / ankle -->
+        <ellipse cx="92" cy="672" rx="14" ry="7" fill="#090818"/>
+        <ellipse cx="188" cy="672" rx="14" ry="7" fill="#090818"/>
+        <path d="M78,676 C76,680 74,684 76,686 C84,690 104,690 108,686 C110,682 108,676 100,674 Z" fill="#090818"/>
+        <path d="M202,676 C204,680 206,684 204,686 C196,690 176,690 172,686 C170,682 172,676 180,674 Z" fill="#090818"/>
+      </svg>
+
+    </div><!-- body-wrap -->
+  </div><!-- body-stage -->
+
+  <div class="dots">
+    <div class="dot on" id="d0"></div><div class="dot" id="d1"></div>
+    <div class="dot" id="d2"></div><div class="dot" id="d3"></div>
+    <div class="dot" id="d4"></div><div class="dot" id="d5"></div>
+    <div class="dot" id="d6"></div><div class="dot" id="d7"></div>
+  </div>
+</div><!-- stage -->
+
+<!-- PANEL -->
+<div class="panel">
+  <div class="psec">
+    <div class="ptit">肌群选择</div>
+    <div class="pills">
+      <div class="pill" data-g="chest" onclick="sel('chest')">胸肌</div>
+      <div class="pill" data-g="shoulders" onclick="sel('shoulders')">三角肌</div>
+      <div class="pill" data-g="biceps" onclick="sel('biceps')">二头肌</div>
+      <div class="pill" data-g="triceps" onclick="sel('triceps')">三头肌</div>
+      <div class="pill" data-g="abs" onclick="sel('abs')">腹肌</div>
+      <div class="pill sec" data-g="lats" onclick="sel('lats')">背阔肌</div>
+      <div class="pill sec" data-g="quads" onclick="sel('quads')">腿部</div>
+      <div class="pill sec" data-g="glutes" onclick="sel('glutes')">臀肌</div>
+      <div class="pill" data-g="calves" onclick="sel('calves')">小腿</div>
+      <div class="pill" data-g="forearm" onclick="sel('forearm')">前臂</div>
+    </div>
+  </div>
+  <div class="pinfo" id="pinfo">
+    <div class="empty">⟳<br>拖拽旋转查看全身<br>点击肌肉查看训练详情</div>
+  </div>
+  <div class="pbot"><button class="cta" id="cta" onclick="go()">生成训练计划 →</button></div>
+</div>
+
+</div><!-- main -->
+<div class="bot">
+  <span>拖拽旋转360°查看 · 滚轮缩放 · 点击肌肉查看详情</span>
+  <span id="bang">—</span>
+</div>
+</div><!-- app -->
+
+<script>
+const DB={
+  chest:{name:'胸大肌',en:'Pectoralis Major',desc:'胸部最大肌群，由锁骨头和胸骨头构成，负责肩关节水平内收、屈曲与内旋。强壮的胸肌是上肢推力的核心来源，也是视觉上最显眼的肌肉之一。',vol:'大肌群',rec:'48-72h',ex:[{i:'🏋️',n:'杠铃卧推',t:'复合·主力'},{i:'🕊️',n:'哑铃飞鸟',t:'孤立·拉伸'},{i:'⬆️',n:'双杠臂屈伸',t:'自重·下胸'},{i:'📐',n:'上斜卧推',t:'复合·上胸'}]},
+  shoulders:{name:'三角肌 + 斜方肌',en:'Deltoid & Trapezius',desc:'三角肌分前中后三束，分别控制肩部前举、外展和后伸。斜方肌连接颈部、背部与肩部，均衡训练是打造宽阔肩型的关键。',vol:'中肌群',rec:'48h',ex:[{i:'🏋️',n:'哑铃肩推',t:'复合·整体'},{i:'↔️',n:'侧平举',t:'孤立·中束'},{i:'⬆️',n:'前平举',t:'孤立·前束'},{i:'🔄',n:'俯身飞鸟',t:'孤立·后束'}]},
+  biceps:{name:'肱二头肌',en:'Biceps Brachii',desc:'由长头和短头组成，负责肘关节屈曲与前臂旋后。长头走行于肱骨结节间沟，决定二头肌的"峰值"形态，是手臂围度最直观的展示。',vol:'小肌群',rec:'36-48h',ex:[{i:'💪',n:'杠铃弯举',t:'复合·基础'},{i:'🔄',n:'哑铃交替弯举',t:'孤立·对称'},{i:'🔨',n:'锤式弯举',t:'肱肌·厚度'},{i:'🎯',n:'集中弯举',t:'孤立·顶峰'}]},
+  triceps:{name:'肱三头肌',en:'Triceps Brachii',desc:'由长头、外侧头和内侧头组成，占上臂体积约2/3。负责肘关节完全伸展，是手臂围度的决定性肌群，长头同时跨越肩关节。',vol:'中肌群',rec:'48h',ex:[{i:'🏋️',n:'窄距卧推',t:'复合·整体'},{i:'⬇️',n:'绳索下压',t:'孤立·外侧头'},{i:'💪',n:'颈后臂屈伸',t:'孤立·长头'},{i:'💎',n:'钻石俯卧撑',t:'自重·整体'}]},
+  abs:{name:'腹直肌 + 腹斜肌',en:'Abs & Obliques',desc:'腹直肌由腱划分为6~8格，负责脊柱屈曲；腹外斜肌和腹内斜肌控制躯干旋转与侧屈。体脂率决定线条清晰度，男性约12%以下可见明显轮廓。',vol:'中肌群',rec:'24-48h',ex:[{i:'🌀',n:'卷腹',t:'基础·上腹'},{i:'⬆️',n:'悬垂举腿',t:'核心·下腹'},{i:'📏',n:'平板支撑',t:'等长·稳定'},{i:'🔄',n:'俄罗斯转体',t:'旋转·腹斜肌'}]},
+  lats:{name:'背阔肌 + 竖脊肌',en:'Latissimus Dorsi & Erectors',desc:'背阔肌是背部面积最大的肌肉，从髂嵴延伸至肱骨，形成倒三角体型。竖脊肌沿脊柱两侧分布，是维持姿势和脊柱伸展的核心。',vol:'大肌群',rec:'72h',ex:[{i:'⬆️',n:'引体向上',t:'自重·宽背'},{i:'⬇️',n:'高位下拉',t:'复合·宽度'},{i:'🚣',n:'坐姿划船',t:'复合·厚度'},{i:'💪',n:'单臂哑铃划船',t:'单侧·均衡'}]},
+  quads:{name:'股四头肌 / 腘绳肌',en:'Quadriceps & Hamstrings',desc:'股四头肌（四个头）覆盖大腿前侧，是人体最大的复合肌群，负责膝关节伸展。后侧腘绳肌（三块）负责膝屈曲与髋伸展，是下肢爆发力的来源。',vol:'大肌群',rec:'72-96h',ex:[{i:'🏋️',n:'深蹲',t:'复合·王者'},{i:'🦵',n:'腿举',t:'复合·大重量'},{i:'🔄',n:'腿弯举',t:'孤立·腘绳肌'},{i:'🚶',n:'弓步行走',t:'功能·单侧'}]},
+  glutes:{name:'臀大肌 + 臀中肌',en:'Gluteus Maximus & Medius',desc:'臀大肌是人体最大的单块肌肉，负责髋关节伸展和外旋，是跑跳发力的核心。臀中肌控制髋外展，对稳定骨盆和保护膝关节至关重要。',vol:'大肌群',rec:'72h',ex:[{i:'⬆️',n:'臀推',t:'孤立·臀大肌'},{i:'🏋️',n:'罗马尼亚硬拉',t:'复合·拉伸'},{i:'🦀',n:'蚌式开合',t:'激活·臀中肌'},{i:'🦵',n:'保加利亚分腿蹲',t:'单侧·均衡'}]},
+  calves:{name:'小腿三头肌',en:'Gastrocnemius & Soleus',desc:'腓肠肌有内外两个头，在膝伸直状态下发力最强；比目鱼肌更深层，在膝弯曲时主导发力。两者共同负责踝关节跖屈，需要高频、高次数刺激。',vol:'小肌群',rec:'36h',ex:[{i:'⬆️',n:'站姿提踵',t:'腓肠肌·主力'},{i:'🪑',n:'坐姿提踵',t:'比目鱼肌·深层'},{i:'🪢',n:'跳绳',t:'有氧·综合'},{i:'🏃',n:'爆发式提踵',t:'爆发力'}]},
+  forearm:{name:'前臂肌群',en:'Forearm Muscles',desc:'前臂由屈肌群（掌侧）和伸肌群（背侧）组成。屈肌群负责腕关节屈曲和手指握力，伸肌群负责腕关节伸展。强壮的前臂是抓握能力的保障。',vol:'小肌群',rec:'36h',ex:[{i:'💪',n:'腕弯举',t:'屈肌·握力'},{i:'⬇️',n:'反握腕弯举',t:'伸肌·力量'},{i:'✊',n:'握力器训练',t:'综合·耐力'},{i:'🏋️',n:'农夫行走',t:'功能·综合'}]}
+};
+
+const SEC=['lats','glutes','quads'];
+let curG=null,angle=0,isDrag=false,startX=0,lastA=0,currentView='front',hintOff=false;
+
+function updateView(){
+  const n=((angle%360)+360)%360;
+  let view='front';
+  if(n>=45&&n<135) view='right';
+  else if(n>=135&&n<225) view='back';
+  else if(n>=225&&n<315) view='left';
+
+  currentView=view;
+  const isFront=view==='front';
+  const isBack=view==='back';
+  const isLeft=view==='left';
+  const isRight=view==='right';
+
+  document.getElementById('svF').style.display=isFront?'block':'none';
+  document.getElementById('svB').style.display=isBack?'block':'none';
+  document.getElementById('svL').style.display=isLeft?'block':'none';
+  document.getElementById('svR').style.display=isRight?'block':'none';
+
+  if(curG) applyHL(curG);
+
+  const t=n<180?n:360-n;
+  const sx=Math.max(0.12,Math.cos((t/180)*Math.PI*0.5));
+  const sk=(Math.sin((t/180)*Math.PI)*14*0.28);
+  document.getElementById('bodyWrap').style.transform=`scaleX(${sx}) skewY(${sk}deg)`;
+
+  const lb=n<45||n>=315?'正面':n<135?'右侧':n<225?'背面':'左侧';
+  document.getElementById('vlabel').textContent=lb+' '+Math.round(n)+'°';
+  document.getElementById('bang').textContent=lb+' · '+Math.round(n)+'°';
+  const di=Math.round(n/45)%8;
+  for(let i=0;i<8;i++) document.getElementById('d'+i).className='dot'+(i===di?' on':'');
+  document.getElementById('glowFloor').style.background=
+    curG&&SEC.includes(curG)?
+    'radial-gradient(ellipse,rgba(124,77,255,.13) 0%,transparent 70%)':
+    'radial-gradient(ellipse,rgba(255,87,34,.1) 0%,transparent 70%)';
+}
+
+const bs=document.getElementById('bodyStage');
+function dn(e){isDrag=true;startX=e.touches?e.touches[0].clientX:e.clientX;lastA=angle;if(!hintOff){document.getElementById('dhint').style.opacity='0';hintOff=true}}
+function mv(e){if(!isDrag)return;const x=e.touches?e.touches[0].clientX:e.clientX;angle=lastA+(x-startX)*0.46;updateView()}
+function up(){isDrag=false}
+bs.addEventListener('mousedown',dn);
+window.addEventListener('mousemove',mv);
+window.addEventListener('mouseup',up);
+bs.addEventListener('touchstart',dn,{passive:true});
+window.addEventListener('touchmove',mv,{passive:true});
+window.addEventListener('touchend',up);
+bs.addEventListener('wheel',e=>{e.preventDefault();},{ passive:false});
+
+setTimeout(()=>{
+  if(hintOff)return;
+  let a=0;const iv=setInterval(()=>{a+=1.4;angle=a;updateView();if(a>=55){clearInterval(iv);angle=0;updateView()}},16);
+},900);
+
+function applyHL(g){
+  document.querySelectorAll('.muscle').forEach(m=>{m.classList.remove('on','sec')});
+  document.querySelectorAll('[data-g="'+g+'"]').forEach(m=>{m.classList.add('on');if(SEC.includes(g))m.classList.add('sec')});
+}
+
+function sel(g){
+  curG=g;applyHL(g);
+  document.querySelectorAll('.pill').forEach(p=>p.classList.remove('on'));
+  const p=document.querySelector('.pill[data-g="'+g+'"]');
+  if(p) p.classList.add('on');
+  const d=DB[g];if(!d)return;
+  const is=SEC.includes(g);
+  const ac=is?'#7c4dff':'#ff5722';
+  const bg=is?'rgba(124,77,255,.14)':'rgba(255,87,34,.14)';
+  document.getElementById('pinfo').innerHTML=`
+    <div class="icard">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div><h3>${d.name}</h3><div class="ien">${d.en}</div></div>
+        <span style="font-size:9px;font-weight:700;padding:2px 8px;border-radius:20px;background:${bg};color:${ac};flex-shrink:0;margin-left:8px">${is?'背面':'正面'}</span>
+      </div>
+      <p>${d.desc}</p>
+      <div class="istats">
+        <div class="ist"><div class="isv">${d.vol}</div><div class="isl">分级</div></div>
+        <div class="ist"><div class="isv">${d.rec}</div><div class="isl">恢复</div></div>
+      </div>
+    </div>
+    <div class="ptit" style="margin:4px 0 8px">推荐动作</div>
+    ${d.ex.map(e=>`<div class="ex"><div class="ei">${e.i}</div><div><div class="en2">${e.n}</div><div class="et">${e.t}</div></div></div>`).join('')}
+  `;
+  document.getElementById('cta').classList.add('on');
+  updateView();
+}
+
+function go(){
+  if(curG&&DB[curG]) alert('训练计划：训练 '+DB[curG].name+'\n\n在实际App中这里会生成完整计划。');
+}
+</script>
+</body>
+</html>

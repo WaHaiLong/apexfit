@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>APEXFIT — 3D肌肉图谱</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@300;400;500;600&display=swap');
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100%;height:100%;background:#08080f;font-family:'Inter',sans-serif;overflow:hidden}
+:root{--acc:#ff5722;--acc2:#7c4dff;--bg:#08080f;--bg2:#0f0f1c;--bg3:#171728;--t1:#f5f0ea;--t2:#666480;--bd:rgba(255,255,255,0.07)}
+.app{display:flex;flex-direction:column;height:100vh}
+.top{display:flex;align-items:center;justify-content:space-between;padding:10px 20px;border-bottom:1px solid var(--bd);background:rgba(8,8,15,.96);flex-shrink:0;z-index:10}
+.logo{font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:3px;color:var(--acc)}
+.logo em{color:var(--t1);font-style:normal}
+.pulse-wrap{display:flex;align-items:center;gap:6px;font-size:10px;color:var(--t2)}
+.pulse{width:5px;height:5px;border-radius:50%;background:var(--acc);animation:pk 1.6s ease-in-out infinite}
+@keyframes pk{0%,100%{opacity:1}50%{opacity:.2}}
+.badge{font-size:10px;font-weight:600;color:var(--t2);background:var(--bg3);border:1px solid var(--bd);border-radius:20px;padding:3px 12px}
+.main{display:flex;flex:1;overflow:hidden}
+
+/* STAGE */
+.stage{flex:1;position:relative;overflow:hidden;background:radial-gradient(ellipse 65% 75% at 50% 45%,#110e28 0%,#08080f 72%)}
+.grid{position:absolute;inset:0;background-image:linear-gradient(rgba(255,255,255,.018) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.018) 1px,transparent 1px);background-size:36px 36px;pointer-events:none}
+.glow-floor{position:absolute;bottom:-20px;left:50%;transform:translateX(-50%);width:260px;height:60px;background:radial-gradient(ellipse,rgba(255,87,34,.1) 0%,transparent 70%);pointer-events:none;transition:background .4s}
+
+#canvas3d{width:100%;height:100%;display:block}
+
+/* drag hint */
+.drag-hint{position:absolute;top:14px;left:50%;transform:translateX(-50%);font-size:10px;color:var(--t2);display:flex;align-items:center;gap:6px;letter-spacing:.8px;transition:opacity .4s;pointer-events:none}
+.dh-icon{width:30px;height:18px;border:1px solid rgba(255,255,255,.2);border-radius:9px;display:flex;align-items:center;justify-content:center}
+.dh-dot{width:5px;height:5px;border-radius:50%;background:var(--t2);animation:slide 1.5s ease-in-out infinite}
+@keyframes slide{0%,100%{transform:translateX(-7px)}50%{transform:translateX(7px)}}
+
+/* PANEL */
+.panel{width:218px;flex-shrink:0;border-left:1px solid var(--bd);display:flex;flex-direction:column;background:rgba(8,8,15,.96)}
+.psec{padding:13px;border-bottom:1px solid var(--bd);flex-shrink:0}
+.ptit{font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--t2);margin-bottom:9px}
+.pills{display:flex;flex-wrap:wrap;gap:4px}
+.pill{padding:3px 9px;border-radius:20px;font-size:10px;font-weight:600;border:1px solid var(--bd);color:var(--t2);cursor:pointer;transition:all .18s}
+.pill:hover{border-color:var(--acc);color:var(--acc)}
+.pill.on{background:rgba(255,87,34,.15);border-color:var(--acc);color:var(--acc)}
+.pill.on.sec{background:rgba(124,77,255,.15);border-color:var(--acc2);color:var(--acc2)}
+.pinfo{flex:1;overflow-y:auto;padding:12px;scrollbar-width:thin;scrollbar-color:#1a1a2a transparent}
+.icard{background:var(--bg2);border:1px solid var(--bd);border-radius:11px;padding:12px;margin-bottom:9px}
+.icard h3{font-size:14px;font-weight:600;color:var(--t1);margin-bottom:1px}
+.ien{font-size:10px;color:var(--t2);margin-bottom:8px}
+.icard p{font-size:11px;color:var(--t2);line-height:1.7}
+.istats{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:9px}
+.ist{background:var(--bg3);border-radius:8px;padding:7px;text-align:center}
+.isv{font-size:12px;font-weight:700;color:var(--acc)}
+.isl{font-size:9px;color:var(--t2);margin-top:1px}
+.ex{display:flex;align-items:center;gap:7px;padding:7px 8px;border-radius:8px;background:var(--bg2);border:1px solid var(--bd);margin-bottom:5px;transition:border-color .2s,transform .1s;cursor:pointer}
+.ex:hover{border-color:var(--acc);transform:translateX(2px)}
+.ei{width:24px;height:24px;border-radius:6px;background:rgba(255,87,34,.12);display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0}
+.en2{font-size:11px;font-weight:500;color:var(--t1)}
+.et{font-size:9px;color:var(--t2)}
+.empty{text-align:center;padding:36px 10px;color:var(--t2);font-size:11px;line-height:2.1}
+.pbot{padding:11px;border-top:1px solid var(--bd);flex-shrink:0}
+.cta{width:100%;padding:10px;border-radius:10px;background:linear-gradient(135deg,#ff5722,#e64a19);border:none;color:#fff;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;cursor:pointer;opacity:0;pointer-events:none;transition:opacity .3s,transform .15s;box-shadow:0 3px 16px rgba(255,87,34,.2)}
+.cta.on{opacity:1;pointer-events:all}
+.cta:hover{transform:translateY(-1px);box-shadow:0 5px 20px rgba(255,87,34,.38)}
+.bot{border-top:1px solid var(--bd);padding:8px 20px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;background:rgba(8,8,15,.96)}
+.bot span{font-size:10px;color:var(--t2)}
+#bang{font-size:10px;font-weight:600;color:var(--acc)}
+</style>
+</head>
+<body>
+<div class="app">
+<div class="top">
+  <div class="logo">APEX<em>FIT</em></div>
+  <div class="pulse-wrap"><span class="pulse"></span>拖拽旋转360° · 点击肌肉 · 滚轮缩放</div>
+  <div class="badge" id="vlabel">3D 视角</div>
+</div>
+<div class="main">
+
+<!-- STAGE -->
+<div class="stage">
+  <div class="grid"></div>
+  <div class="glow-floor" id="glowFloor"></div>
+  <div class="drag-hint" id="dhint"><div class="dh-icon"><div class="dh-dot"></div></div>拖拽旋转查看</div>
+  <canvas id="canvas3d"></canvas>
+</div>
+
+<!-- PANEL -->
+<div class="panel">
+  <div class="psec">
+    <div class="ptit">肌群选择</div>
+    <div class="pills">
+      <div class="pill" data-g="chest" onclick="sel('chest')">胸肌</div>
+      <div class="pill" data-g="shoulders" onclick="sel('shoulders')">三角肌</div>
+      <div class="pill" data-g="biceps" onclick="sel('biceps')">二头肌</div>
+      <div class="pill" data-g="triceps" onclick="sel('triceps')">三头肌</div>
+      <div class="pill" data-g="abs" onclick="sel('abs')">腹肌</div>
+      <div class="pill sec" data-g="lats" onclick="sel('lats')">背阔肌</div>
+      <div class="pill sec" data-g="quads" onclick="sel('quads')">腿部</div>
+      <div class="pill sec" data-g="glutes" onclick="sel('glutes')">臀肌</div>
+      <div class="pill" data-g="calves" onclick="sel('calves')">小腿</div>
+      <div class="pill" data-g="forearm" onclick="sel('forearm')">前臂</div>
+    </div>
+  </div>
+  <div class="pinfo" id="pinfo">
+    <div class="empty">⟳<br>拖拽旋转查看全身<br>点击肌肉查看训练详情</div>
+  </div>
+  <div class="pbot"><button class="cta" id="cta" onclick="go()">生成训练计划 →</button></div>
+</div>
+
+</div>
+<div class="bot">
+  <span>拖拽旋转360°查看 · 滚轮缩放 · 点击肌肉查看详情</span>
+  <span id="bang">3D · —</span>
+</div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+
+// 数据库
+const DB={
+  chest:{name:'胸大肌',en:'Pectoralis Major',desc:'胸部最大肌群，由锁骨头和胸骨头构成，负责肩关节水平内收、屈曲与内旋。强壮的胸肌是上肢推力的核心来源，也是视觉上最显眼的肌肉之一。',vol:'大肌群',rec:'48-72h',ex:[{i:'🏋️',n:'杠铃卧推',t:'复合·主力'},{i:'🕊️',n:'哑铃飞鸟',t:'孤立·拉伸'},{i:'⬆️',n:'双杠臂屈伸',t:'自重·下胸'},{i:'📐',n:'上斜卧推',t:'复合·上胸'}]},
+  shoulders:{name:'三角肌 + 斜方肌',en:'Deltoid & Trapezius',desc:'三角肌分前中后三束，分别控制肩部前举、外展和后伸。斜方肌连接颈部、背部与肩部，均衡训练是打造宽阔肩型的关键。',vol:'中肌群',rec:'48h',ex:[{i:'🏋️',n:'哑铃肩推',t:'复合·整体'},{i:'↔️',n:'侧平举',t:'孤立·中束'},{i:'⬆️',n:'前平举',t:'孤立·前束'},{i:'🔄',n:'俯身飞鸟',t:'孤立·后束'}]},
+  biceps:{name:'肱二头肌',en:'Biceps Brachii',desc:'由长头和短头组成，负责肘关节屈曲与前臂旋后。长头走行于肱骨结节间沟，决定二头肌的"峰值"形态，是手臂围度最直观的展示。',vol:'小肌群',rec:'36-48h',ex:[{i:'💪',n:'杠铃弯举',t:'复合·基础'},{i:'🔄',n:'哑铃交替弯举',t:'孤立·对称'},{i:'🔨',n:'锤式弯举',t:'肱肌·厚度'},{i:'🎯',n:'集中弯举',t:'孤立·顶峰'}]},
+  triceps:{name:'肱三头肌',en:'Triceps Brachii',desc:'由长头、外侧头和内侧头组成，占上臂体积约2/3。负责肘关节完全伸展，是手臂围度的决定性肌群，长头同时跨越肩关节。',vol:'中肌群',rec:'48h',ex:[{i:'🏋️',n:'窄距卧推',t:'复合·整体'},{i:'⬇️',n:'绳索下压',t:'孤立·外侧头'},{i:'💪',n:'颈后臂屈伸',t:'孤立·长头'},{i:'💎',n:'钻石俯卧撑',t:'自重·整体'}]},
+  abs:{name:'腹直肌 + 腹斜肌',en:'Abs & Obliques',desc:'腹直肌由腱划分为6~8格，负责脊柱屈曲；腹外斜肌和腹内斜肌控制躯干旋转与侧屈。体脂率决定线条清晰度，男性约12%以下可见明显轮廓。',vol:'中肌群',rec:'24-48h',ex:[{i:'🌀',n:'卷腹',t:'基础·上腹'},{i:'⬆️',n:'悬垂举腿',t:'核心·下腹'},{i:'📏',n:'平板支撑',t:'等长·稳定'},{i:'🔄',n:'俄罗斯转体',t:'旋转·腹斜肌'}]},
+  lats:{name:'背阔肌 + 竖脊肌',en:'Latissimus Dorsi & Erectors',desc:'背阔肌是背部面积最大的肌肉，从髂嵴延伸至肱骨，形成倒三角体型。竖脊肌沿脊柱两侧分布，是维持姿势和脊柱伸展的核心。',vol:'大肌群',rec:'72h',ex:[{i:'⬆️',n:'引体向上',t:'自重·宽背'},{i:'⬇️',n:'高位下拉',t:'复合·宽度'},{i:'🚣',n:'坐姿划船',t:'复合·厚度'},{i:'💪',n:'单臂哑铃划船',t:'单侧·均衡'}]},
+  quads:{name:'股四头肌 / 腘绳肌',en:'Quadriceps & Hamstrings',desc:'股四头肌（四个头）覆盖大腿前侧，是人体最大的复合肌群，负责膝关节伸展。后侧腘绳肌（三块）负责膝屈曲与髋伸展，是下肢爆发力的来源。',vol:'大肌群',rec:'72-96h',ex:[{i:'🏋️',n:'深蹲',t:'复合·王者'},{i:'🦵',n:'腿举',t:'复合·大重量'},{i:'🔄',n:'腿弯举',t:'孤立·腘绳肌'},{i:'🚶',n:'弓步行走',t:'功能·单侧'}]},
+  glutes:{name:'臀大肌 + 臀中肌',en:'Gluteus Maximus & Medius',desc:'臀大肌是人体最大的单块肌肉，负责髋关节伸展和外旋，是跑跳发力的核心。臀中肌控制髋外展，对稳定骨盆和保护膝关节至关重要。',vol:'大肌群',rec:'72h',ex:[{i:'⬆️',n:'臀推',t:'孤立·臀大肌'},{i:'🏋️',n:'罗马尼亚硬拉',t:'复合·拉伸'},{i:'🦀',n:'蚌式开合',t:'激活·臀中肌'},{i:'🦵',n:'保加利亚分腿蹲',t:'单侧·均衡'}]},
+  calves:{name:'小腿三头肌',en:'Gastrocnemius & Soleus',desc:'腓肠肌有内外两个头，在膝伸直状态下发力最强；比目鱼肌更深层，在膝弯曲时主导发力。两者共同负责踝关节跖屈，需要高频、高次数刺激。',vol:'小肌群',rec:'36h',ex:[{i:'⬆️',n:'站姿提踵',t:'腓肠肌·主力'},{i:'🪑',n:'坐姿提踵',t:'比目鱼肌·深层'},{i:'🪢',n:'跳绳',t:'有氧·综合'},{i:'🏃',n:'爆发式提踵',t:'爆发力'}]},
+  forearm:{name:'前臂肌群',en:'Forearm Muscles',desc:'前臂由屈肌群（掌侧）和伸肌群（背侧）组成。屈肌群负责腕关节屈曲和手指握力，伸肌群负责腕关节伸展。强壮的前臂是抓握能力的保障。',vol:'小肌群',rec:'36h',ex:[{i:'💪',n:'腕弯举',t:'屈肌·握力'},{i:'⬇️',n:'反握腕弯举',t:'伸肌·力量'},{i:'✊',n:'握力器训练',t:'综合·耐力'},{i:'🏋️',n:'农夫行走',t:'功能·综合'}]}
+};
+
+const SEC=['lats','glutes','quads'];
+let curG=null,hintOff=false;
+
+// Three.js setup
+const canvas=document.getElementById('canvas3d');
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x08080f);
+
+const camera=new THREE.PerspectiveCamera(45,canvas.clientWidth/canvas.clientHeight,0.1,1000);
+camera.position.set(0,0,5);
+
+const renderer=new THREE.WebGLRenderer({canvas,antialias:true});
+renderer.setSize(canvas.clientWidth,canvas.clientHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio,2));
+renderer.toneMapping=THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure=1.2;
+
+// Post-processing
+const composer=new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene,camera));
+const bloomPass=new UnrealBloomPass(new THREE.Vector2(canvas.clientWidth,canvas.clientHeight),0.8,0.4,0.85);
+composer.addPass(bloomPass);
+
+// Lighting
+const ambientLight=new THREE.AmbientLight(0xffffff,0.4);
+scene.add(ambientLight);
+
+const keyLight=new THREE.DirectionalLight(0xffffff,1);
+keyLight.position.set(5,5,5);
+scene.add(keyLight);
+
+const fillLight=new THREE.DirectionalLight(0x8888ff,0.3);
+fillLight.position.set(-5,0,5);
+scene.add(fillLight);
+
+const rimLight=new THREE.DirectionalLight(0xff8844,0.4);
+rimLight.position.set(0,5,-5);
+scene.add(rimLight);
+
+// Materials
+const skinMaterial=new THREE.MeshStandardMaterial({
+  color:0x1a1830,
+  roughness:0.7,
+  metalness:0.1,
+  transparent:true,
+  opacity:0.95
+});
+
+const muscleMaterial=new THREE.MeshStandardMaterial({
+  color:0x1e1c34,
+  roughness:0.6,
+  metalness:0.1,
+  transparent:true,
+  opacity:0.7
+});
+
+function createGlowMaterial(isSec=false){
+  return new THREE.MeshStandardMaterial({
+    color:isSec?0x7c4dff:0xff5722,
+    roughness:0.3,
+    metalness:0.2,
+    emissive:isSec?0x7c4dff:0xff5722,
+    emissiveIntensity:0.5,
+    transparent:true,
+    opacity:0.85
+  });
+}
+
+// Body group
+const bodyGroup=new THREE.Group();
+scene.add(bodyGroup);
+
+// Muscle meshes storage
+const muscleMeshes={};
+const originalMaterials={};
+
+// Helper function to create body part
+function createBodyPart(geometry,material,position,rotation=[0,0,0],name=''){
+  const mesh=new THREE.Mesh(geometry,material);
+  mesh.position.set(...position);
+  mesh.rotation.set(...rotation);
+  if(name) mesh.name=name;
+  return mesh;
+}
+
+// HEAD
+const headGeo=new THREE.SphereGeometry(0.18,32,32);
+const head=createBodyPart(headGeo,skinMaterial,[0,1.6,0],[0,0,0],'head');
+bodyGroup.add(head);
+
+// NECK
+const neckGeo=new THREE.CylinderGeometry(0.06,0.08,0.15,16);
+const neck=createBodyPart(neckGeo,skinMaterial,[0,1.38,0],[0,0,0],'neck');
+bodyGroup.add(neck);
+
+// TORSO - using capsule-like shape
+const torsoGeo=new THREE.CapsuleGeometry(0.22,0.6,8,16);
+const torso=createBodyPart(torsoGeo,skinMaterial,[0,0.95,0],[0,0,0],'torso');
+bodyGroup.add(torso);
+
+// PELVIS
+const pelvisGeo=new THREE.CapsuleGeometry(0.18,0.15,8,16);
+const pelvis=createBodyPart(pelvisGeo,skinMaterial,[0,0.45,0],[0,0,0],'pelvis');
+bodyGroup.add(pelvis);
+
+// SHOULDERS (deltoids)
+function createShoulder(side){
+  const shoulderGeo=new THREE.SphereGeometry(0.12,16,16);
+  const x=side===-1?-0.32:0.32;
+  const shoulder=createBodyPart(shoulderGeo,muscleMaterial.clone(),[x,1.35,0],[0,0,0],'shoulders');
+  shoulder.userData.group='shoulders';
+  shoulder.userData.side=side;
+  muscleMeshes['shoulders']=muscleMeshes['shoulders']||[];
+  muscleMeshes['shoulders'].push(shoulder);
+  originalMaterials[shoulder.uuid]=shoulder.material;
+  return shoulder;
+}
+bodyGroup.add(createShoulder(-1));
+bodyGroup.add(createShoulder(1));
+
+// CHEST (pectorals)
+function createChest(side){
+  const chestGeo=new THREE.SphereGeometry(0.14,16,16);
+  chestGeo.scale(1,0.8,0.6);
+  const x=side===-1?-0.18:0.18;
+  const chest=createBodyPart(chestGeo,muscleMaterial.clone(),[x,1.15,0.1],[0,0,side*0.2],'chest');
+  chest.userData.group='chest';
+  chest.userData.side=side;
+  muscleMeshes['chest']=muscleMeshes['chest']||[];
+  muscleMeshes['chest'].push(chest);
+  originalMaterials[chest.uuid]=chest.material;
+  return chest;
+}
+bodyGroup.add(createChest(-1));
+bodyGroup.add(createChest(1);
+
+// ABS
+function createAbs(){
+  const absGeo=new THREE.BoxGeometry(0.2,0.35,0.12);
+  const abs=createBodyPart(absGeo,muscleMaterial.clone(),[0,0.75,0.12],[0,0,0],'abs');
+  abs.userData.group='abs';
+  muscleMeshes['abs']=muscleMeshes['abs']||[];
+  muscleMeshes['abs'].push(abs);
+  originalMaterials[abs.uuid]=abs.material;
+  return abs;
+}
+bodyGroup.add(createAbs());
+
+// LATS
+function createLat(side){
+  const latGeo=new THREE.BoxGeometry(0.12,0.4,0.08);
+  const x=side===-1?-0.22:0.22;
+  const lat=createBodyPart(latGeo,muscleMaterial.clone(),[x,0.85,-0.08],[0,0,side*0.15],'lats');
+  lat.userData.group='lats';
+  lat.userData.side=side;
+  muscleMeshes['lats']=muscleMeshes['lats']||[];
+  muscleMeshes['lats'].push(lat);
+  originalMaterials[lat.uuid]=lat.material;
+  return lat;
+}
+bodyGroup.add(createLat(-1));
+bodyGroup.add(createLat(1));
+
+// ARMS
+// BICEPS
+function createBicep(side){
+  const bicepGeo=new THREE.CapsuleGeometry(0.055,0.2,8,16);
+  bicepGeo.rotateZ(Math.PI/2);
+  const x=side===-1?-0.42:0.42;
+  const bicep=createBodyPart(bicepGeo,muscleMaterial.clone(),[x,1.1,0.05],[0,0,side*0.1],'biceps');
+  bicep.userData.group='biceps';
+  bicep.userData.side=side;
+  muscleMeshes['biceps']=muscleMeshes['biceps']||[];
+  muscleMeshes['biceps'].push(bicep);
+  originalMaterials[bicep.uuid]=bicep.material;
+  return bicep;
+}
+bodyGroup.add(createBicep(-1));
+bodyGroup.add(createBicep(1));
+
+// TRICEPS
+function createTricep(side){
+  const tricepGeo=new THREE.CapsuleGeometry(0.055,0.22,8,16);
+  tricepGeo.rotateZ(Math.PI/2);
+  const x=side===-1?-0.42:0.42;
+  const tricep=createBodyPart(tricepGeo,muscleMaterial.clone(),[x,1.08,-0.05],[0,0,side*0.1],'triceps');
+  tricep.userData.group='triceps';
+  tricep.userData.side=side;
+  muscleMeshes['triceps']=muscleMeshes['triceps']||[];
+  muscleMeshes['triceps'].push(tricep);
+  originalMaterials[tricep.uuid]=tricep.material;
+  return tricep;
+}
+bodyGroup.add(createTricep(-1));
+bodyGroup.add(createTricep(1));
+
+// FOREARMS
+function createForearm(side){
+  const forearmGeo=new THREE.CapsuleGeometry(0.045,0.22,8,16);
+  forearmGeo.rotateZ(Math.PI/2);
+  const x=side===-1?-0.55:0.55;
+  const forearm=createBodyPart(forearmGeo,muscleMaterial.clone(),[x,0.82,0],[0,0,side*0.15],'forearm');
+  forearm.userData.group='forearm';
+  forearm.userData.side=side;
+  muscleMeshes['forearm']=muscleMeshes['forearm']||[];
+  muscleMeshes['forearm'].push(forearm);
+  originalMaterials[forearm.uuid]=forearm.material;
+  return forearm;
+}
+bodyGroup.add(createForearm(-1));
+bodyGroup.add(createForearm(1));
+
+// LEGS - UPPER
+// QUADS
+function createQuad(side){
+  const quadGeo=new THREE.CapsuleGeometry(0.09,0.35,8,16);
+  const x=side===-1?-0.1:0.1;
+  const quad=createBodyPart(quadGeo,muscleMaterial.clone(),[x,0.08,0.05],[0,0,0],'quads');
+  quad.userData.group='quads';
+  quad.userData.side=side;
+  muscleMeshes['quads']=muscleMeshes['quads']||[];
+  muscleMeshes['quads'].push(quad);
+  originalMaterials[quad.uuid]=quad.material;
+  return quad;
+}
+bodyGroup.add(createQuad(-1));
+bodyGroup.add(createQuad(1));
+
+// GLUTES
+function createGlute(side){
+  const gluteGeo=new THREE.SphereGeometry(0.12,16,16);
+  gluteGeo.scale(1,0.7,0.8);
+  const x=side===-1?-0.1:0.1;
+  const glute=createBodyPart(gluteGeo,muscleMaterial.clone(),[x,0.38,-0.05],[0,0,0],'glutes');
+  glute.userData.group='glutes';
+  glute.userData.side=side;
+  muscleMeshes['glutes']=muscleMeshes['glutes']||[];
+  muscleMeshes['glutes'].push(glute);
+  originalMaterials[glute.uuid]=glute.material;
+  return glute;
+}
+bodyGroup.add(createGlute(-1));
+bodyGroup.add(createGlute(1));
+
+// CALVES
+function createCalf(side){
+  const calfGeo=new THREE.CapsuleGeometry(0.055,0.28,8,16);
+  const x=side===-1?-0.1:0.1;
+  const calf=createBodyPart(calfGeo,muscleMaterial.clone(),[x,-0.38,0],[0,0,0],'calves');
+  calf.userData.group='calves';
+  calf.userData.side=side;
+  muscleMeshes['calves']=muscleMeshes['calves']||[];
+  muscleMeshes['calves'].push(calf);
+  originalMaterials[calf.uuid]=calf.material;
+  return calf;
+}
+bodyGroup.add(createCalf(-1));
+bodyGroup.add(createCalf(1));
+
+// Center body
+bodyGroup.position.y=0.3;
+
+// Controls
+const controls=new OrbitControls(camera,renderer.domElement);
+controls.enableDamping=true;
+controls.dampingFactor=0.05;
+controls.minDistance=2;
+controls.maxDistance=10;
+controls.enablePan=false;
+controls.target.set(0,0.8,0);
+
+controls.addEventListener('start',()=>{
+  if(!hintOff){
+    document.getElementById('dhint').style.opacity='0';
+    hintOff=true;
+  }
+});
+
+// Raycaster for click detection
+const raycaster=new THREE.Raycaster();
+const mouse=new THREE.Vector2();
+
+function onMouseClick(event){
+  const rect=canvas.getBoundingClientRect();
+  mouse.x=((event.clientX-rect.left)/rect.width)*2-1;
+  mouse.y=-((event.clientY-rect.top)/rect.height)*2+1;
+
+  raycaster.setFromCamera(mouse,camera);
+  const intersects=raycaster.intersectObjects(bodyGroup.children,true);
+
+  if(intersects.length>0){
+    const obj=intersects[0].object;
+    if(obj.userData.group){
+      window.sel(obj.userData.group);
+    }
+  }
+}
+
+canvas.addEventListener('click',onMouseClick);
+
+// Animation
+function animate(){
+  requestAnimationFrame(animate);
+  controls.update();
+  composer.render();
+}
+animate();
+
+// Resize handler
+window.addEventListener('resize',()=>{
+  const width=canvas.clientWidth;
+  const height=canvas.clientHeight;
+  camera.aspect=width/height;
+  camera.updateProjectionMatrix();
+  renderer.setSize(width,height);
+  composer.setSize(width,height);
+});
+
+// Expose sel function to window
+window.sel=function(g){
+  curG=g;
+  applyHL(g);
+  document.querySelectorAll('.pill').forEach(p=>p.classList.remove('on'));
+  const p=document.querySelector('.pill[data-g="'+g+'"]');
+  if(p) p.classList.add('on');
+  const d=DB[g];if(!d)return;
+  const is=SEC.includes(g);
+  const ac=is?'#7c4dff':'#ff5722';
+  const bg=is?'rgba(124,77,255,.14)':'rgba(255,87,34,.14)';
+  document.getElementById('pinfo').innerHTML=`
+    <div class="icard">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div><h3>${d.name}</h3><div class="ien">${d.en}</div></div>
+      </div>
+      <p>${d.desc}</p>
+      <div class="istats">
+        <div class="ist"><div class="isv">${d.vol}</div><div class="isl">分级</div></div>
+        <div class="ist"><div class="isv">${d.rec}</div><div class="isl">恢复</div></div>
+      </div>
+    </div>
+    <div class="ptit" style="margin:4px 0 8px">推荐动作</div>
+    ${d.ex.map(e=>`<div class="ex"><div class="ei">${e.i}</div><div><div class="en2">${e.n}</div><div class="et">${e.t}</div></div></div>`).join('')}
+  `;
+  document.getElementById('cta').classList.add('on');
+
+  // Update label
+  const az=Math.round(controls.getAzimuthalAngle()*180/Math.PI);
+  document.getElementById('bang').textContent=`3D · ${az}°`;
+  document.getElementById('glowFloor').style.background=
+    curG&&SEC.includes(curG)?
+    'radial-gradient(ellipse,rgba(124,77,255,.13) 0%,transparent 70%)':
+    'radial-gradient(ellipse,rgba(255,87,34,.1) 0%,transparent 70%)';
+};
+
+function applyHL(g){
+  // Reset all muscles
+  Object.values(muscleMeshes).flat().forEach(m=>{
+    m.material=originalMaterials[m.uuid].clone();
+  });
+
+  if(!g||!muscleMeshes[g])return;
+
+  const isSec=SEC.includes(g);
+  const glowMat=createGlowMaterial(isSec);
+
+  muscleMeshes[g].forEach(m=>{
+    m.material=glowMat;
+  });
+}
+
+window.go=function(){
+  if(curG&&DB[curG]) alert('训练计划：训练 '+DB[curG].name+'\n\n在实际App中这里会生成完整计划。');
+};
+</script>
+</body>
+</html>
