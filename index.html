@@ -111,6 +111,15 @@ html,body{width:100%;height:100%;background:#08080f;font-family:'Inter',sans-ser
 .mcard-exs{display:flex;flex-direction:column;gap:4px}
 .mcard-ex{display:flex;align-items:center;gap:6px;font-size:10px;color:var(--t2);padding:3px 0;border-top:1px solid var(--bd)}
 
+/* REGION GRID */
+.rgrid{display:grid;grid-template-columns:1fr 1fr;gap:5px}
+.rbtn{display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 4px;border-radius:10px;border:1px solid var(--bd);background:var(--bg3);cursor:pointer;font-size:18px;transition:all .18s}
+.rbtn span{font-size:10px;font-weight:600;color:var(--t2);letter-spacing:.5px}
+.rbtn:hover{border-color:var(--acc);background:rgba(255,87,34,.08)}
+.rbtn:hover span{color:var(--acc)}
+.rbtn.on{border-color:var(--acc);background:rgba(255,87,34,.12)}
+.rbtn.on span{color:var(--acc)}
+
 /* BOTTOM */
 .bot{border-top:1px solid var(--bd);padding:8px 20px;display:flex;justify-content:space-between;align-items:center;flex-shrink:0;background:rgba(8,8,15,.96)}
 .bot span{font-size:10px;color:var(--t2)}
@@ -315,22 +324,23 @@ html,body{width:100%;height:100%;background:#08080f;font-family:'Inter',sans-ser
   <!-- INFO PANEL -->
   <div class="panel">
     <div class="psec">
-      <div class="ptit">肌群选择</div>
-      <div class="pills">
-        <div class="pill" data-g="chest" onclick="sel('chest')">胸肌</div>
-        <div class="pill" data-g="shoulders" onclick="sel('shoulders')">三角肌</div>
-        <div class="pill" data-g="biceps" onclick="sel('biceps')">二头肌</div>
-        <div class="pill" data-g="triceps" onclick="sel('triceps')">三头肌</div>
-        <div class="pill" data-g="abs" onclick="sel('abs')">腹肌</div>
-        <div class="pill sec" data-g="lats" onclick="sel('lats')">背阔肌</div>
-        <div class="pill sec" data-g="quads" onclick="sel('quads')">腿部</div>
-        <div class="pill sec" data-g="glutes" onclick="sel('glutes')">臀肌</div>
-        <div class="pill" data-g="calves" onclick="sel('calves')">小腿</div>
-        <div class="pill" data-g="forearm" onclick="sel('forearm')">前臂</div>
+      <div class="ptit">选择部位</div>
+      <div class="rgrid">
+        <div class="rbtn" onclick="selRegion('back')">🦅<span>背部</span></div>
+        <div class="rbtn" onclick="selRegion('chest')">🏋️<span>胸部</span></div>
+        <div class="rbtn" onclick="selRegion('shoulders')">💪<span>肩膀</span></div>
+        <div class="rbtn" onclick="selRegion('arms')">💪<span>手臂</span></div>
+        <div class="rbtn" onclick="selRegion('core')">⚡<span>腹部</span></div>
+        <div class="rbtn" onclick="selRegion('legs')">🦵<span>腿部</span></div>
+        <div class="rbtn" onclick="selRegion('glutes')">🍑<span>臀部</span></div>
       </div>
     </div>
+    <div class="psec" id="muscleSection" style="display:none">
+      <div class="ptit" id="muscleSectionTitle">具体肌肉</div>
+      <div class="pills" id="regionPills"></div>
+    </div>
     <div class="pinfo" id="pinfo">
-      <div class="empty">←<br>点击人体图上的肌肉<br>或左侧选择肌群<br>查看训练详情</div>
+      <div class="empty">↑<br>选择上方部位<br>或直接点击人体图<br>查看训练详情</div>
     </div>
     <div class="pbot"><button class="cta" id="cta" onclick="go()">生成训练计划 →</button></div>
   </div>
@@ -369,6 +379,66 @@ let curView = 'atlas', curSide = 'front', curG = null;
 // Auto side mapping
 const FRONT_ONLY = ['chest','biceps','abs'];
 const BACK_ONLY  = ['lats','glutes','triceps'];
+
+// Body region definitions (plain language → muscles + auto side)
+const REGIONS = {
+  back:      { label:'背部', side:'back',  muscles:['lats'],                     hint:'背阔肌 · 竖脊肌' },
+  chest:     { label:'胸部', side:'front', muscles:['chest'],                    hint:'胸大肌' },
+  shoulders: { label:'肩膀', side:null,    muscles:['shoulders'],                hint:'三角肌前中后束' },
+  arms:      { label:'手臂', side:'front', muscles:['biceps','triceps','forearm'],hint:'二头 · 三头 · 前臂' },
+  core:      { label:'腹部', side:'front', muscles:['abs'],                      hint:'腹直肌 · 腹斜肌' },
+  legs:      { label:'腿部', side:'front', muscles:['quads','calves'],           hint:'股四头肌 · 小腿' },
+  glutes:    { label:'臀部', side:'back',  muscles:['glutes'],                   hint:'臀大肌 · 臀中肌' },
+};
+
+// Muscle display names in plain language
+const MUSCLE_LABEL = {
+  chest:'胸大肌', shoulders:'三角肌', biceps:'二头肌',
+  triceps:'三头肌', abs:'腹肌', lats:'背阔肌',
+  quads:'大腿', glutes:'臀大肌', calves:'小腿', forearm:'前臂'
+};
+
+window.selRegion = function(region) {
+  const r = REGIONS[region];
+  if (!r) return;
+
+  // Update region buttons
+  document.querySelectorAll('.rbtn').forEach(b => b.classList.remove('on'));
+  event.currentTarget.classList.add('on');
+
+  // Auto switch side
+  if (r.side) setSide(r.side);
+
+  // If only one muscle in region, select it directly
+  if (r.muscles.length === 1) {
+    sel(r.muscles[0]);
+    document.getElementById('muscleSection').style.display = 'none';
+  } else {
+    // Show sub-muscle pills
+    const sec = document.getElementById('muscleSection');
+    const title = document.getElementById('muscleSectionTitle');
+    const pills = document.getElementById('regionPills');
+    title.textContent = r.label + ' — 选择具体肌肉';
+    pills.innerHTML = r.muscles.map(g =>
+      `<div class="pill ${SEC.includes(g)?'sec':''}" data-g="${g}" onclick="sel('${g}')">${MUSCLE_LABEL[g]}</div>`
+    ).join('');
+    sec.style.display = '';
+    // Highlight all muscles in region
+    highlightMultiple(r.muscles);
+    // Clear panel info
+    document.getElementById('pinfo').innerHTML = `<div class="empty" style="padding:20px 10px">${r.hint}<br><br>选择上方具体肌肉<br>查看训练动作</div>`;
+    document.getElementById('cta').classList.remove('on');
+  }
+};
+
+function highlightMultiple(groups) {
+  curG = null;
+  document.querySelectorAll('.m-muscle').forEach(el => {
+    el.classList.remove('hi','dim');
+    if (groups.includes(el.getAttribute('data-g'))) el.classList.add('hi');
+    else el.classList.add('dim');
+  });
+}
 
 function setView(v) {
   curView = v;
@@ -426,10 +496,9 @@ function applyHL(g) {
 window.sel = function(g) {
   curG = g;
 
-  // Update pills
+  // Update pills (both panel and region sub-pills)
   document.querySelectorAll('.pill').forEach(p => p.classList.remove('on'));
-  const pill = document.querySelector('.pill[data-g="' + g + '"]');
-  if (pill) pill.classList.add('on');
+  document.querySelectorAll('.pill[data-g="' + g + '"]').forEach(p => p.classList.add('on'));
 
   // Auto-switch side
   if (BACK_ONLY.includes(g) && curSide === 'front') setSide('back');
